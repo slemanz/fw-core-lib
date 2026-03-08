@@ -11,8 +11,8 @@ typedef struct output_t *outputPtr_t;
 *                    CREATE/DESTROY                         *
 *************************************************************/
 
-outputPtr_t output_create(const char *name, PWM_Interface_t *pwm);
-outputPtr_t output_createWithUuid(const char *name, PWM_Interface_t *pwm, uint32_t uuid);
+outputPtr_t output_create(const char *name, uint8_t pwm_id);
+outputPtr_t output_createWithUuid(const char *name, uint8_t pwm_id, uint32_t uuid);
 outputPtr_t output_getByUuid(uint32_t uuid);
 void        output_destroy(outputPtr_t out);
 

@@ -27,20 +27,20 @@ void    comm_deinit        (uint8_t comm_id);
 
 typedef enum
 {
-    IO_OK              =  0,   /**< Operação concluída com sucesso       */
-    IO_ERR_NULL        = -1,   /**< Ponteiro nulo recebido               */
-    IO_ERR_INVALID_PIN = -2,   /**< pin_id fora do range configurado     */
-    IO_ERR_NOT_INIT    = -3,   /**< Pino não inicializado                */
-    IO_ERR_HW_FAULT    = -4,   /**< Falha reportada pelo driver GPIO     */
-    IO_ERR_TIMEOUT     = -5,   /**< Timeout numa operação de I/O         */
+    IO_OK              =  0,
+    IO_ERR_NULL        = -1,
+    IO_ERR_INVALID_PIN = -2,
+    IO_ERR_NOT_INIT    = -3,
+    IO_ERR_HW_FAULT    = -4,
+    IO_ERR_TIMEOUT     = -5,
 }io_status_t;
 
 typedef enum
 {
-    IO_OPT_MODE        = 0u,   /**< Direction: input / output / analog / altfn */
-    IO_OPT_PULL        = 1u,   /**< Pull resistor: none / up / down             */
-    IO_OPT_SPEED       = 2u,   /**< Output drive speed                          */
-    IO_OPT_OUTPUT_TYPE = 3u,   /**< Output stage: push-pull / open-drain        */
+    IO_OPT_MODE        = 0u,
+    IO_OPT_PULL        = 1u,
+    IO_OPT_SPEED       = 2u,
+    IO_OPT_OUTPUT_TYPE = 3u,
 } io_option_e;
 
 /* Values for IO_OPT_PULL */
@@ -88,13 +88,8 @@ ADC_Interface_t *ADC_Interface_get(uint8_t channel);
 *                       PWM                                 *
 *************************************************************/
 
-typedef struct
-{
-    void (*init)(void);
-    void (*set_duty)(float dutyPercent);    /**< 0.0 – 100.0 */
-    void (*deinit)(void);
-} PWM_Interface_t;
-
-PWM_Interface_t *PWM_Interface_get(uint8_t instance);
+void PWM_init    (uint8_t instance_id);
+void PWM_set_duty(uint8_t instance_id, float duty_percent);
+void PWM_deinit  (uint8_t instance_id);
 
 #endif /* INC_INTERFACE_H_ */

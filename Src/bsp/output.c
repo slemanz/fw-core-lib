@@ -5,10 +5,10 @@
 struct output_t
 {
     const char      *name;
-    PWM_Interface_t *pwm;
-    uint32_t         uuid;
-    uint8_t          duty;
-    outputPtr_t      next;
+    uint8_t         pwm_id;
+    uint32_t        uuid;
+    uint8_t         duty;
+    outputPtr_t     next;
 };
 
 static outputPtr_t output_header = NULL;
@@ -22,16 +22,14 @@ static bool outputList_uuidExists(uint32_t uuid);
 *                    CREATE/DESTROY                         *
 *************************************************************/
 
-outputPtr_t output_create(const char *name, PWM_Interface_t *pwm)
+outputPtr_t output_create(const char *name, uint8_t pwm_id)
 {
-    if (pwm == NULL) return NULL;
-
     outputPtr_t out = (outputPtr_t)pool_Allocate();
 
     if (out)
     {
         out->name = name;
-        out->pwm  = pwm;
+        out->pwm_id  = pwm_id;
         out->duty = 0U;
         out->next = NULL;
 
@@ -41,7 +39,7 @@ outputPtr_t output_create(const char *name, PWM_Interface_t *pwm)
         }
         out->uuid = uuid_count++;
 
-        out->pwm->init();
+        PWM_init(pwm_id);
         outputList_insert(out);
 
         uprint("*** %s created ***\r\n", out->name);
@@ -54,10 +52,8 @@ outputPtr_t output_create(const char *name, PWM_Interface_t *pwm)
     return out;
 }
 
-outputPtr_t output_createWithUuid(const char *name, PWM_Interface_t *pwm, uint32_t uuid)
+outputPtr_t output_createWithUuid(const char *name, uint8_t pwm_id, uint32_t uuid)
 {
-    if (pwm == NULL) return NULL;
-
     if (outputList_uuidExists(uuid))
     {
         uprint("Failed to create %s: UUID %u already exists\r\n", name, uuid);
@@ -69,12 +65,12 @@ outputPtr_t output_createWithUuid(const char *name, PWM_Interface_t *pwm, uint32
     if (out)
     {
         out->name = name;
-        out->pwm  = pwm;
+        out->pwm_id  = pwm_id;
         out->uuid = uuid;
         out->duty = 0U;
         out->next = NULL;
 
-        out->pwm->init();
+        PWM_init(pwm_id);
         outputList_insert(out);
 
         uprint("*** %s created with UUID %u ***\r\n", out->name, out->uuid);
@@ -105,7 +101,7 @@ void output_destroy(outputPtr_t out)
     if (out == NULL) return;
 
     output_off(out);
-    if (out->pwm->deinit) out->pwm->deinit();
+    PWM_deinit(out->pwm_id);
 
     uprint("*** %s destroyed ***\r\n", out->name);
     outputList_delete(out);
@@ -123,7 +119,7 @@ void output_set(outputPtr_t out, uint8_t dutyPercent)
     if (dutyPercent > 100U) dutyPercent = 100U;
 
     out->duty = dutyPercent;
-    out->pwm->set_duty((float)dutyPercent);
+    PWM_set_duty(out->pwm_id, dutyPercent);
 }
 
 void output_on(outputPtr_t out)

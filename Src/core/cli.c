@@ -71,7 +71,7 @@ void cli_help(void)
     if(cli_table == NULL) return;
 
     uprint("===================================\r\n");
-    for (int i = 0; i < cli_table_len; i++)
+    for (uint32_t i = 0; i < cli_table_len; i++)
     {
     	uprint("%s: %s\r\n", cli_table[i].name, cli_table[i].help);
     }
