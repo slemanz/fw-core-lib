@@ -75,14 +75,9 @@ io_status_t IO_deinit(uint8_t pin_id);
 *                       ADC                                 *
 *************************************************************/
 
-typedef struct
-{
-    void     (*init)(void);
-    uint16_t (*read)(void);         /**< Returns raw ADC value */
-    void     (*deinit)(void);
-} ADC_Interface_t;
-
-ADC_Interface_t *ADC_Interface_get(uint8_t channel);
+void     analog_init  (uint8_t channel_id);
+uint16_t analog_read  (uint8_t channel_id);
+void     analog_deinit(uint8_t channel_id);
 
 /************************************************************
 *                       PWM                                 *
