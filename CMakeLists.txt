@@ -19,6 +19,7 @@ set(COMMON_SOURCES_BSP
 set(COMMON_SOURCES_SHARED
     Src/shared/pool.c
     Src/shared/ring-buffer.c
+    Src/shared/slist.c
 )
 
 # Agrupa todos os sources em uma variável só para o add_library
