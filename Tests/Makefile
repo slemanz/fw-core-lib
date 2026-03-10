@@ -15,6 +15,7 @@ INCLUDES += -I /usr/include
 
 # Production code under test
 PROD += $(DIR_BUILD)/ring-buffer.o
+PROD += $(DIR_BUILD)/slist.o
 PROD += $(DIR_BUILD)/simple-timer.o
 PROD += $(DIR_BUILD)/pool.o
 PROD += $(DIR_BUILD)/led.o
@@ -23,6 +24,7 @@ PROD += $(DIR_BUILD)/uprint.o
 # Test runner
 TESTS += $(DIR_BUILD)/AllTestRunner.o
 TESTS += $(DIR_BUILD)/test_ring_buffer.o
+TESTS += $(DIR_BUILD)/test_slist.o
 TESTS += $(DIR_BUILD)/test_simple_timer.o
 TESTS += $(DIR_BUILD)/test_led.o
 
@@ -63,9 +65,10 @@ $(DIR_BUILD)/%.o: $(DIR_COMMON)/Src/bsp/%.c
 $(DIR_BUILD)/%.o: mocks/%.c
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $<
 
+# can use -v for verbose
 test: $(PROD) $(MOCKS) $(TESTS)
 	$(LD) -o $(DIR_BUILD)/run_tests $^ $(LDFLAGS)
-	$(DIR_BUILD)/run_tests -v
+	$(DIR_BUILD)/run_tests 
 
 clean:
 	rm -rf $(DIR_BUILD)
