@@ -1,6 +1,7 @@
 #include "bsp/led.h"
 #include "core/uprint.h"
 #include "shared/pool.h"
+#include "shared/slist.h"
 
 /* ================================================================== */
 /*  Internal structures                                                */
@@ -12,7 +13,7 @@ struct led_t
     uint8_t     pin_id;
     uint32_t    uuid;
     bool        inverted;
-    ledPtr_t    next;
+    slist_node_t node; 
 };
 
 struct led_rgb_t
@@ -31,8 +32,8 @@ struct led_rgb_t
 /*  Linked list state                                                  */
 /* ================================================================== */
 
-static ledPtr_t    s_led_head       = NULL;
-static uint32_t    s_uuid_count     = 1u;
+static slist_head_t s_led_list;
+static uint32_t    s_uuid_count     = 0u;
 
 static ledRgbPtr_t s_led_rgb_head   = NULL;
 static uint8_t     s_uuid_rgb_count = 1u;
@@ -42,9 +43,7 @@ static uint8_t     s_uuid_rgb_count = 1u;
 /*  Forward declarations                                               */
 /* ================================================================== */
 
-static void led_list_insert       (ledPtr_t led);
-static void led_list_delete       (ledPtr_t led);
-static bool led_list_uuid_exists  (uint32_t uuid);
+static bool led_uuid_exists(uint32_t uuid);
 
 static void rgb_list_insert       (ledRgbPtr_t led);
 static void rgb_list_delete       (ledRgbPtr_t led);
@@ -67,25 +66,21 @@ ledPtr_t led_create(const char *name, uint8_t pin_id)
     led->name     = name;
     led->pin_id   = pin_id;
     led->inverted = false;
-    led->next     = NULL;
 
-    while(led_list_uuid_exists(s_uuid_count))
-    {
-        s_uuid_count++;
-    }
+    while(led_uuid_exists(s_uuid_count)) s_uuid_count++;
     led->uuid = s_uuid_count++;
 
-    led_list_insert(led);
-    uprint("*** %s created (UUID %lu) ***\r\n", led->name, led->uuid);
+    slist_push_front(&s_led_list, &led->node);
+    uprint("*** %s created (UUID %u) ***\r\n", led->name, led->uuid);
 
     return led;
 }
 
 ledPtr_t led_createWithUuid(const char *name, uint8_t pin_id, uint32_t uuid)
 {
-    if (led_list_uuid_exists(uuid))
+    if (led_uuid_exists(uuid))
     {
-        uprint("Failed to create %s: UUID %lu already exists\r\n", name, uuid);
+        uprint("Failed to create %s: UUID %u already exists\r\n", name, uuid);
         return NULL;
     }
 
@@ -101,29 +96,39 @@ ledPtr_t led_createWithUuid(const char *name, uint8_t pin_id, uint32_t uuid)
     led->pin_id   = pin_id;
     led->uuid     = uuid;
     led->inverted = false;
-    led->next     = NULL;
 
-    led_list_insert(led);
+    slist_push_front(&s_led_list, &led->node);
     uprint("*** %s created with UUID %lu ***\r\n", led->name, led->uuid);
 
     return led;
+}
+
+static bool led_uuid_exists(uint32_t uuid)
+{
+    slist_node_t *it;
+    slist_for_each(it, &s_led_list)
+    {
+        ledPtr_t led = container_of(it, struct led_t, node);
+        if (led->uuid == uuid) return true;
+    }
+    return false;
 }
 
 void led_destroy(ledPtr_t led)
 {
     if (led == NULL) return;
     uprint("*** %s destroyed ***\r\n", led->name);
-    led_list_delete(led);
+    slist_remove(&s_led_list, &led->node);
     pool_Free(led);
 }
 
 ledPtr_t led_getByUuid(uint32_t uuid)
 {
-    ledPtr_t cur = s_led_head;
-    while (cur != NULL)
+    slist_node_t *it;
+    slist_for_each(it, &s_led_list)
     {
-        if (cur->uuid == uuid) return cur;
-        cur = cur->next;
+        ledPtr_t led = container_of(it, struct led_t, node);
+        if(led->uuid == uuid) return led;
     }
     return NULL;
 }
@@ -169,55 +174,19 @@ io_status_t led_toggle(ledPtr_t led)
 void led_displayInfo(ledPtr_t led)
 {
     if (led == NULL) return;
-    uprint("Device: %s | UUID: %lu | pin_id: %u\r\n",
+    uprint("Device: %s | UUID: %u | pin_id: %u\r\n",
            led->name, led->uuid, led->pin_id);
 }
 
 void led_displayAll(void)
 {
-    ledPtr_t cur = s_led_head;
-    while (cur != NULL)
+    slist_node_t *it;
+    slist_for_each(it, &s_led_list)
     {
-        uprint("  %s (UUID: %lu, pin_id: %u)\r\n",
-               cur->name, cur->uuid, cur->pin_id);
-        cur = cur->next;
+        ledPtr_t led = container_of(it, struct led_t, node);
+        uprint("  %s (UUID: %u, pin_id: %u)\r\n",
+               led->name, led->uuid, led->pin_id);
     }
-}
-
-/* ================================================================== */
-/*  Single LED — list helpers                                         */
-/* ================================================================== */
-
-static void led_list_insert(ledPtr_t led)
-{
-    if (s_led_head == NULL) { s_led_head = led; return; }
-    ledPtr_t cur = s_led_head;
-    while (cur->next != NULL) cur = cur->next;
-    cur->next = led;
-}
-
-static void led_list_delete(ledPtr_t led)
-{
-    ledPtr_t cur  = s_led_head;
-    ledPtr_t prev = NULL;
-    while (cur != NULL)
-    {
-        if (cur == led)
-        {
-            if (prev == NULL) s_led_head = cur->next;
-            else              prev->next = cur->next;
-            return;
-        }
-        prev = cur;
-        cur  = cur->next;
-    }
-}
-
-static bool led_list_uuid_exists(uint32_t uuid)
-{
-    ledPtr_t cur = s_led_head;
-    while (cur != NULL) { if (cur->uuid == uuid) return true; cur = cur->next; }
-    return false;
 }
 
 /* ================================================================== */
