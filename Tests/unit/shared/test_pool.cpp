@@ -100,3 +100,42 @@ TEST(Pool, ReallocatedBlockIsZeroed)
         BYTES_EQUAL(0, ptr2[i]);
     }
 }
+
+/* ---- GetFreeBlockCount ------------------------------------------- */
+
+TEST(Pool, FreeBlockCountStartsFull)
+{
+    UNSIGNED_LONGS_EQUAL(POOL_BLOCK_COUNT, pool_GetFreeBlockCount());
+}
+
+TEST(Pool, FreeBlockCountDecrementsOnAllocate)
+{
+    pool_Allocate();
+    UNSIGNED_LONGS_EQUAL(POOL_BLOCK_COUNT - 1, pool_GetFreeBlockCount());
+}
+
+TEST(Pool, FreeBlockCountIncrementsOnFree)
+{
+    void *ptr = pool_Allocate();
+    pool_Free(ptr);
+    UNSIGNED_LONGS_EQUAL(POOL_BLOCK_COUNT, pool_GetFreeBlockCount());
+}
+
+/* ---- IsFromPool -------------------------------------------------- */
+
+TEST(Pool, IsFromPoolReturnsTrueForAllocatedBlock)
+{
+    void *ptr = pool_Allocate();
+    CHECK(pool_IsFromPool(ptr));
+}
+
+TEST(Pool, IsFromPoolReturnsFalseForStackPointer)
+{
+    uint8_t stack_var;
+    CHECK_FALSE(pool_IsFromPool(&stack_var));
+}
+
+TEST(Pool, IsFromPoolReturnsFalseForNull)
+{
+    CHECK_FALSE(pool_IsFromPool(NULL));
+}
