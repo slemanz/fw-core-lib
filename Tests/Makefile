@@ -16,6 +16,7 @@ INCLUDES += -I /usr/include
 # Production code under test
 PROD += $(DIR_BUILD)/ring-buffer.o
 PROD += $(DIR_BUILD)/slist.o
+PROD += $(DIR_BUILD)/pool.o
 PROD += $(DIR_BUILD)/simple-timer.o
 PROD += $(DIR_BUILD)/pool.o
 PROD += $(DIR_BUILD)/led.o
@@ -27,6 +28,7 @@ TESTS += $(DIR_BUILD)/test_ring_buffer.o
 TESTS += $(DIR_BUILD)/test_slist.o
 TESTS += $(DIR_BUILD)/test_simple_timer.o
 TESTS += $(DIR_BUILD)/test_led.o
+TESTS += $(DIR_BUILD)/test_pool.o
 
 # Mocks
 MOCKS += $(DIR_BUILD)/mock_timebase.o
