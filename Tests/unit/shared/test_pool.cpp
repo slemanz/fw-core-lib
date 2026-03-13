@@ -139,3 +139,64 @@ TEST(Pool, IsFromPoolReturnsFalseForNull)
 {
     CHECK_FALSE(pool_IsFromPool(NULL));
 }
+
+/* ================================================================== */
+/*  TEST GROUP: PoolBig                                                */
+/* ================================================================== */
+
+TEST_GROUP(PoolBig)
+{
+    void setup()
+    {
+        poolBig_Init();
+    }
+
+    void teardown() {}
+};
+
+TEST(PoolBig, AllocateReturnsNonNull)
+{
+    CHECK(poolBig_Allocate() != NULL);
+}
+
+TEST(PoolBig, AllocateAllBlocksSucceeds)
+{
+    for (uint32_t i = 0; i < POOL_BIG_BLOCK_COUNT; i++)
+    {
+        CHECK(poolBig_Allocate() != NULL);
+    }
+}
+
+TEST(PoolBig, AllocateReturnsNullWhenExhausted)
+{
+    for (uint32_t i = 0; i < POOL_BIG_BLOCK_COUNT; i++)
+        poolBig_Allocate();
+
+    POINTERS_EQUAL(NULL, poolBig_Allocate());
+}
+
+TEST(PoolBig, FreeAndReallocateSucceeds)
+{
+    void *ptr = poolBig_Allocate();
+    poolBig_Free(ptr);
+
+    CHECK(poolBig_Allocate() != NULL);
+}
+
+TEST(PoolBig, FreeBlockCountStartsFull)
+{
+    UNSIGNED_LONGS_EQUAL(POOL_BIG_BLOCK_COUNT, poolBig_GetFreeBlockCount());
+}
+
+TEST(PoolBig, IsFromPoolReturnsTrueForAllocatedBlock)
+{
+    void *ptr = poolBig_Allocate();
+    CHECK(poolBig_IsFromPool(ptr));
+}
+
+TEST(PoolBig, IsFromPoolReturnsFalseForStandardPoolBlock)
+{
+    pool_Init();
+    void *std_ptr = pool_Allocate();
+    CHECK_FALSE(poolBig_IsFromPool(std_ptr));
+}
