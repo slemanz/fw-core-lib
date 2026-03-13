@@ -25,7 +25,7 @@ struct led_rgb_t
     uint8_t          uuid;
     bool             inverted;
     led_rgb_color_e  current_color;
-    ledRgbPtr_t      next;
+    slist_node_t     node;
 };
 
 /* ================================================================== */
@@ -35,8 +35,8 @@ struct led_rgb_t
 static slist_head_t s_led_list;
 static uint32_t    s_uuid_count     = 0u;
 
-static ledRgbPtr_t s_led_rgb_head   = NULL;
-static uint8_t     s_uuid_rgb_count = 1u;
+static slist_head_t s_led_rgb_list;
+static uint8_t      s_uuid_rgb_count = 1u;
 
 
 /* ================================================================== */
@@ -45,9 +45,7 @@ static uint8_t     s_uuid_rgb_count = 1u;
 
 static bool led_uuid_exists(uint32_t uuid);
 
-static void rgb_list_insert       (ledRgbPtr_t led);
-static void rgb_list_delete       (ledRgbPtr_t led);
-static bool rgb_list_uuid_exists  (uint8_t uuid);
+static bool rgb_uuid_exists(uint8_t uuid);
 
 /* ================================================================== */
 /*  Single LED — creation                                             */
@@ -210,13 +208,12 @@ ledRgbPtr_t led_rgb_create(const char *name,
     led->pin_b         = pin_b;
     led->inverted      = false;
     led->current_color = LED_RGB_COLOR_OFF;
-    led->next          = NULL;
 
-    while (rgb_list_uuid_exists(s_uuid_rgb_count))
+    while (rgb_uuid_exists(s_uuid_rgb_count))
         s_uuid_rgb_count++;
     led->uuid = s_uuid_rgb_count++;
 
-    rgb_list_insert(led);
+    slist_push_front(&s_led_rgb_list, &led->node);
     uprint("*** %s created (UUID %u) ***\r\n", led->name, led->uuid);
 
     return led;
@@ -226,7 +223,7 @@ ledRgbPtr_t led_rgb_createWithUuid(const char *name,
                                     uint8_t pin_r, uint8_t pin_g, uint8_t pin_b,
                                     uint8_t uuid)
 {
-    if (rgb_list_uuid_exists(uuid))
+    if (rgb_uuid_exists(uuid))
     {
         uprint("Failed to create %s: UUID %u already exists\r\n", name, uuid);
         return NULL;
@@ -247,9 +244,8 @@ ledRgbPtr_t led_rgb_createWithUuid(const char *name,
     led->uuid          = uuid;
     led->inverted      = false;
     led->current_color = LED_RGB_COLOR_OFF;
-    led->next          = NULL;
 
-    rgb_list_insert(led);
+    slist_push_front(&s_led_rgb_list, &led->node);
     uprint("*** %s created with UUID %u ***\r\n", led->name, led->uuid);
 
     return led;
@@ -259,14 +255,18 @@ void led_rgb_destroy(ledRgbPtr_t led)
 {
     if (led == NULL) return;
     uprint("*** %s destroyed ***\r\n", led->name);
-    rgb_list_delete(led);
+    slist_remove(&s_led_rgb_list, &led->node);
     pool_Free(led);
 }
 
 ledRgbPtr_t led_rgb_getByUuid(uint8_t uuid)
 {
-    ledRgbPtr_t cur = s_led_rgb_head;
-    while (cur != NULL) { if (cur->uuid == uuid) return cur; cur = cur->next; }
+    slist_node_t *it;
+    slist_for_each(it, &s_led_rgb_list)
+    {
+        ledRgbPtr_t led = container_of(it, struct led_rgb_t, node);
+        if (led->uuid == uuid) return led;
+    }
     return NULL;
 }
 
@@ -378,11 +378,11 @@ void led_rgb_displayInfo(ledRgbPtr_t led)
 
 void led_rgb_displayAll(void)
 {
-    ledRgbPtr_t cur = s_led_rgb_head;
-    while (cur != NULL)
+    slist_node_t *it;
+    slist_for_each(it, &s_led_rgb_list)
     {
-        uprint("  %s (UUID: %u)\r\n", cur->name, cur->uuid);
-        cur = cur->next;
+        ledRgbPtr_t led = container_of(it, struct led_rgb_t, node);
+        uprint("  %s (UUID: %u)\r\n", led->name, led->uuid);
     }
 }
 
@@ -390,34 +390,13 @@ void led_rgb_displayAll(void)
 /*  RGB LED — list helpers                                            */
 /* ================================================================== */
 
-static void rgb_list_insert(ledRgbPtr_t led)
+static bool rgb_uuid_exists(uint8_t uuid)
 {
-    if (s_led_rgb_head == NULL) { s_led_rgb_head = led; return; }
-    ledRgbPtr_t cur = s_led_rgb_head;
-    while (cur->next != NULL) cur = cur->next;
-    cur->next = led;
-}
-
-static void rgb_list_delete(ledRgbPtr_t led)
-{
-    ledRgbPtr_t cur  = s_led_rgb_head;
-    ledRgbPtr_t prev = NULL;
-    while (cur != NULL)
+    slist_node_t *it;
+    slist_for_each(it, &s_led_rgb_list)
     {
-        if (cur == led)
-        {
-            if (prev == NULL) s_led_rgb_head = cur->next;
-            else              prev->next     = cur->next;
-            return;
-        }
-        prev = cur;
-        cur  = cur->next;
+        ledRgbPtr_t led = container_of(it, struct led_rgb_t, node);
+        if (led->uuid == uuid) return true;
     }
-}
-
-static bool rgb_list_uuid_exists(uint8_t uuid)
-{
-    ledRgbPtr_t cur = s_led_rgb_head;
-    while (cur != NULL) { if (cur->uuid == uuid) return true; cur = cur->next; }
     return false;
 }
