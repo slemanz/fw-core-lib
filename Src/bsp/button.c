@@ -2,6 +2,7 @@
 #include "core/uprint.h"
 #include "core/simple-timer.h"
 #include "shared/pool.h"
+#include "shared/slist.h"
 
 /* ================================================================== */
 /*  Internal types                                                     */
@@ -33,23 +34,21 @@ struct button_t
     button_event_e  pending_event;
     bool            is_pressed;
 
-    buttonPtr_t     next;
+    slist_node_t    node;
 };
 
 /* ================================================================== */
 /*  List state                                                         */
 /* ================================================================== */
 
-static buttonPtr_t s_btn_head    = NULL;
-static uint32_t    s_uuid_count  = 1u;
+static slist_head_t s_btn_list;
+static uint32_t     s_uuid_count  = 1u;
 
 /* ================================================================== */
 /*  Forward declarations                                               */
 /* ================================================================== */
 
-static void btn_list_insert     (buttonPtr_t btn);
-static void btn_list_delete     (buttonPtr_t btn);
-static bool btn_list_uuid_exists(uint32_t uuid);
+static bool btn_uuid_exists(uint32_t uuid);
 
 /* ================================================================== */
 /*  Private helper                                                     */
@@ -93,13 +92,12 @@ buttonPtr_t button_create(const char *name,
     btn->state         = BTN_STATE_IDLE;
     btn->pending_event = BUTTON_EVENT_NONE;
     btn->is_pressed    = false;
-    btn->next          = NULL;
 
-    while (btn_list_uuid_exists(s_uuid_count))
+    while (btn_uuid_exists(s_uuid_count))
         s_uuid_count++;
     btn->uuid = s_uuid_count++;
 
-    btn_list_insert(btn);
+    slist_push_front(&s_btn_list, &btn->node);
     uprint("*** %s created ***\r\n", btn->name);
 
     return btn;
@@ -111,7 +109,7 @@ buttonPtr_t button_createWithUuid(const char *name,
                                    uint32_t   hold_time_ms,
                                    uint32_t   uuid)
 {
-    if (btn_list_uuid_exists(uuid))
+    if (btn_uuid_exists(uuid))
     {
         uprint("Failed to create %s: UUID %lu already exists\r\n", name, uuid);
         return NULL;
@@ -134,9 +132,8 @@ buttonPtr_t button_createWithUuid(const char *name,
     btn->state         = BTN_STATE_IDLE;
     btn->pending_event = BUTTON_EVENT_NONE;
     btn->is_pressed    = false;
-    btn->next          = NULL;
 
-    btn_list_insert(btn);
+    slist_push_front(&s_btn_list, &btn->node);
     uprint("*** %s created with UUID %lu ***\r\n", btn->name, btn->uuid);
 
     return btn;
@@ -146,17 +143,17 @@ void button_destroy(buttonPtr_t btn)
 {
     if (btn == NULL) return;
     uprint("*** %s destroyed ***\r\n", btn->name);
-    btn_list_delete(btn);
+    slist_remove(&s_btn_list, &btn->node);
     poolBig_Free(btn);
 }
 
 buttonPtr_t button_getByUuid(uint32_t uuid)
 {
-    buttonPtr_t cur = s_btn_head;
-    while (cur != NULL)
+    slist_node_t *it;
+    slist_for_each(it, &s_btn_list)
     {
-        if (cur->uuid == uuid) return cur;
-        cur = cur->next;
+        buttonPtr_t btn = container_of(it, struct button_t, node);
+        if (btn->uuid == uuid) return btn;
     }
     return NULL;
 }
@@ -286,11 +283,11 @@ void button_displayInfo(buttonPtr_t btn)
 
 void button_displayAll(void)
 {
-    buttonPtr_t cur = s_btn_head;
-    while (cur != NULL)
+    slist_node_t *it;
+    slist_for_each(it, &s_btn_list)
     {
-        uprint("  %s (UUID: %lu)\r\n", cur->name, cur->uuid);
-        cur = cur->next;
+        buttonPtr_t btn = container_of(it, struct button_t, node);
+        uprint("  %s (UUID: %lu)\r\n", btn->name, btn->uuid);
     }
 }
 
@@ -298,34 +295,13 @@ void button_displayAll(void)
 /*  List helpers                                                       */
 /* ================================================================== */
 
-static void btn_list_insert(buttonPtr_t btn)
+static bool btn_uuid_exists(uint32_t uuid)
 {
-    if (s_btn_head == NULL) { s_btn_head = btn; return; }
-    buttonPtr_t cur = s_btn_head;
-    while (cur->next != NULL) cur = cur->next;
-    cur->next = btn;
-}
-
-static void btn_list_delete(buttonPtr_t btn)
-{
-    buttonPtr_t cur  = s_btn_head;
-    buttonPtr_t prev = NULL;
-    while (cur != NULL)
+    slist_node_t *it;
+    slist_for_each(it, &s_btn_list)
     {
-        if (cur == btn)
-        {
-            if (prev == NULL) s_btn_head = cur->next;
-            else              prev->next = cur->next;
-            return;
-        }
-        prev = cur;
-        cur  = cur->next;
+        buttonPtr_t btn = container_of(it, struct button_t, node);
+        if (btn->uuid == uuid) return true;
     }
-}
-
-static bool btn_list_uuid_exists(uint32_t uuid)
-{
-    buttonPtr_t cur = s_btn_head;
-    while (cur != NULL) { if (cur->uuid == uuid) return true; cur = cur->next; }
     return false;
 }
