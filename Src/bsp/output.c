@@ -1,6 +1,7 @@
 #include "bsp/output.h"
 #include "core/uprint.h"
 #include "shared/pool.h"
+#include "shared/slist.h"
 
 struct output_t
 {
@@ -8,15 +9,13 @@ struct output_t
     uint8_t         pwm_id;
     uint32_t        uuid;
     uint8_t         duty;
-    outputPtr_t     next;
+    slist_node_t    node;
 };
 
-static outputPtr_t output_header = NULL;
-static uint32_t    uuid_count    = 1U;
+static slist_head_t s_output_list;
+static uint32_t     s_uuid_count = 1U;
 
-static void outputList_insert(outputPtr_t out);
-static void outputList_delete(outputPtr_t out);
-static bool outputList_uuidExists(uint32_t uuid);
+static bool output_uuid_exists(uint32_t uuid);
 
 /************************************************************
 *                    CREATE/DESTROY                         *
@@ -31,16 +30,15 @@ outputPtr_t output_create(const char *name, uint8_t pwm_id)
         out->name = name;
         out->pwm_id  = pwm_id;
         out->duty = 0U;
-        out->next = NULL;
 
-        while (outputList_uuidExists(uuid_count))
+        while (output_uuid_exists(s_uuid_count))
         {
-            uuid_count++;
+            s_uuid_count++;
         }
-        out->uuid = uuid_count++;
+        out->uuid = s_uuid_count++;
 
         PWM_init(pwm_id);
-        outputList_insert(out);
+        slist_push_front(&s_output_list, &out->node);
 
         uprint("*** %s created ***\r\n", out->name);
     }
@@ -54,7 +52,7 @@ outputPtr_t output_create(const char *name, uint8_t pwm_id)
 
 outputPtr_t output_createWithUuid(const char *name, uint8_t pwm_id, uint32_t uuid)
 {
-    if (outputList_uuidExists(uuid))
+    if (output_uuid_exists(uuid))
     {
         uprint("Failed to create %s: UUID %u already exists\r\n", name, uuid);
         return NULL;
@@ -68,10 +66,9 @@ outputPtr_t output_createWithUuid(const char *name, uint8_t pwm_id, uint32_t uui
         out->pwm_id  = pwm_id;
         out->uuid = uuid;
         out->duty = 0U;
-        out->next = NULL;
 
         PWM_init(pwm_id);
-        outputList_insert(out);
+        slist_push_front(&s_output_list, &out->node);
 
         uprint("*** %s created with UUID %u ***\r\n", out->name, out->uuid);
     }
@@ -85,14 +82,12 @@ outputPtr_t output_createWithUuid(const char *name, uint8_t pwm_id, uint32_t uui
 
 outputPtr_t output_getByUuid(uint32_t uuid)
 {
-    outputPtr_t current = output_header;
-
-    while (current != NULL)
+    slist_node_t *it;
+    slist_for_each(it, &s_output_list)
     {
-        if (current->uuid == uuid) return current;
-        current = current->next;
+        outputPtr_t out = container_of(it, struct output_t, node);
+        if (out->uuid == uuid) return out;
     }
-
     return NULL;
 }
 
@@ -104,7 +99,7 @@ void output_destroy(outputPtr_t out)
     PWM_deinit(out->pwm_id);
 
     uprint("*** %s destroyed ***\r\n", out->name);
-    outputList_delete(out);
+    slist_remove(&s_output_list, &out->node);
     pool_Free(out);
 }
 
@@ -150,63 +145,27 @@ void output_displayInfo(outputPtr_t out)
 
 void output_displayAll(void)
 {
-    outputPtr_t current = output_header;
     uprint("************************************************************\r\n");
-    while (current != NULL)
+    slist_node_t *it;
+    slist_for_each(it, &s_output_list)
     {
-        uprint("  [%s] UUID=%u duty=%u%%\r\n", current->name, current->uuid, current->duty);
-        current = current->next;
+        outputPtr_t out = container_of(it, struct output_t, node);
+        uprint("  [%s] UUID=%u duty=%u%%\r\n", out->name, out->uuid, out->duty);
     }
     uprint("************************************************************\r\n");
 }
 
 /************************************************************
-*                          LIST                             *
+*                       LIST HELPERS                        *
 *************************************************************/
 
-static void outputList_insert(outputPtr_t out)
+static bool output_uuid_exists(uint32_t uuid)
 {
-    if (output_header == NULL)
+    slist_node_t *it;
+    slist_for_each(it, &s_output_list)
     {
-        output_header = out;
-        return;
-    }
-
-    outputPtr_t current = output_header;
-    while (current->next != NULL)
-    {
-        current = current->next;
-    }
-    current->next = out;
-}
-
-static void outputList_delete(outputPtr_t out)
-{
-    outputPtr_t current  = output_header;
-    outputPtr_t previous = NULL;
-
-    while (current != NULL)
-    {
-        if (current == out)
-        {
-            if (previous == NULL)
-                output_header = current->next;
-            else
-                previous->next = current->next;
-            return;
-        }
-        previous = current;
-        current  = current->next;
-    }
-}
-
-static bool outputList_uuidExists(uint32_t uuid)
-{
-    outputPtr_t current = output_header;
-    while (current != NULL)
-    {
-        if (current->uuid == uuid) return true;
-        current = current->next;
+        outputPtr_t out = container_of(it, struct output_t, node);
+        if (out->uuid == uuid) return true;
     }
     return false;
 }
